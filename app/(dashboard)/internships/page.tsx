@@ -19,12 +19,16 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 
+import PartnerPlacementModal from './PartnerPlacementModal';
+
 export default function InternshipPage() {
     const { user } = useAuthStore();
-    const [activeTab, setActiveTab] = useState('internships'); // internships, partners, periods
-
     const isStudent = user?.role === 'siswa';
     const isStaff = ['admin', 'super_admin', 'hubin', 'guru'].includes(user?.role || '');
+
+    // Default tab based on role
+    const [activeTab, setActiveTab] = useState(isStudent ? 'internships' : 'partners');
+    const [activePeriodId, setActivePeriodId] = useState<number>(0);
 
     return (
         <div className="space-y-6">
@@ -41,18 +45,23 @@ export default function InternshipPage() {
 
             {/* Tabs */}
             <div className="flex overflow-x-auto gap-4 border-b border-gray-200 dark:border-gray-700">
-                <button
-                    onClick={() => setActiveTab('internships')}
-                    className={cn(
-                        'px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex items-center gap-2',
-                        activeTab === 'internships'
-                            ? 'border-blue-600 text-blue-600'
-                            : 'border-transparent text-gray-500 hover:text-gray-700'
-                    )}
-                >
-                    <Briefcase className="w-4 h-4" />
-                    {isStudent ? 'PKL Saya' : 'Data PKL Siswa'}
-                </button>
+                {/* Student Tab */}
+                {isStudent && (
+                    <button
+                        onClick={() => setActiveTab('internships')}
+                        className={cn(
+                            'px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap flex items-center gap-2',
+                            activeTab === 'internships'
+                                ? 'border-blue-600 text-blue-600'
+                                : 'border-transparent text-gray-500 hover:text-gray-700'
+                        )}
+                    >
+                        <Briefcase className="w-4 h-4" />
+                        PKL Saya
+                    </button>
+                )}
+
+                {/* Staff Tabs */}
                 {isStaff && (
                     <>
                         <button
@@ -97,7 +106,6 @@ function InternshipsTab({ isStudent, isStaff }: { isStudent: boolean, isStaff: b
     const [internships, setInternships] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedId, setSelectedId] = useState<number | null>(null);
-    const [showModal, setShowModal] = useState(false);
 
     useEffect(() => {
         fetchInternships();
@@ -118,14 +126,6 @@ function InternshipsTab({ isStudent, isStaff }: { isStudent: boolean, isStaff: b
 
     return (
         <div className="space-y-4">
-            {isStaff && (
-                <div className="flex justify-end">
-                    <button onClick={() => setShowModal(true)} className="px-4 py-2 bg-blue-600 text-white rounded-xl flex items-center gap-2 hover:bg-blue-700">
-                        <Plus className="w-4 h-4" /> Daftarkan PKL
-                    </button>
-                </div>
-            )}
-
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {internships.map((item) => (
                     <div key={item.id} className="bg-white dark:bg-gray-800 rounded-2xl border p-5 hover:shadow-lg transition-shadow">
@@ -170,8 +170,6 @@ function InternshipsTab({ isStudent, isStaff }: { isStudent: boolean, isStaff: b
                     <div className="col-span-full py-10 text-center text-gray-500">Belum ada data PKL</div>
                 )}
             </div>
-
-            {showModal && <AddInternshipModal onClose={() => setShowModal(false)} onSuccess={() => { fetchInternships(); setShowModal(false); }} />}
         </div>
     );
 }
@@ -262,27 +260,68 @@ function JournalView({ internshipId, onBack, isStudent }: { internshipId: number
 }
 
 // ==========================================
+// ==========================================
 // PARTNERS TAB
 // ==========================================
 function PartnersTab() {
     const [partners, setPartners] = useState<any[]>([]);
     const [showModal, setShowModal] = useState(false);
+    const [editingPartner, setEditingPartner] = useState<any | null>(null);
+    const [activePlacement, setActivePlacement] = useState<any | null>(null);
+
+    const loadData = () => {
+        api.get('/internships/partners').then(res => setPartners(res.data.data));
+    };
 
     useEffect(() => {
-        api.get('/internships/partners').then(res => setPartners(res.data.data));
+        loadData();
     }, []);
+
+    const handleDelete = async (id: number) => {
+        if (!confirm('Hapus mitra ini?')) return;
+        try {
+            await api.delete(`/internships/partners/${id}`);
+            toast.success('Mitra dihapus');
+            loadData();
+        } catch (e) { console.error(e); toast.error('Gagal hapus'); }
+    };
 
     return (
         <div className="space-y-4">
             <div className="flex justify-end">
-                <button onClick={() => setShowModal(true)} className="px-4 py-2 bg-green-600 text-white rounded-xl flex items-center gap-2 hover:bg-green-700">
+                <button
+                    onClick={() => { setEditingPartner(null); setShowModal(true); }}
+                    className="px-4 py-2 bg-green-600 text-white rounded-xl flex items-center gap-2 hover:bg-green-700"
+                >
                     <Plus className="w-4 h-4" /> Tambah Mitra
                 </button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {partners.map((p) => (
-                    <div key={p.id} className="bg-white dark:bg-gray-800 rounded-2xl border p-5">
+                    <div key={p.id} className="bg-white dark:bg-gray-800 rounded-2xl border p-5 group relative">
+                        <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                                title="Kelola Siswa"
+                                onClick={() => setActivePlacement(p)}
+                                className="p-2 bg-gray-100 rounded-lg hover:bg-green-50 text-green-600"
+                            >
+                                <User className="w-4 h-4" />
+                            </button>
+                            <button
+                                onClick={() => { setEditingPartner(p); setShowModal(true); }}
+                                className="p-2 bg-gray-100 rounded-lg hover:bg-blue-50 text-blue-600"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /><path d="m15 5 4 4" /></svg>
+                            </button>
+                            <button
+                                onClick={() => handleDelete(p.id)}
+                                className="p-2 bg-gray-100 rounded-lg hover:bg-red-50 text-red-600"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" /></svg>
+                            </button>
+                        </div>
+
                         <Building2 className="w-8 h-8 text-green-600 mb-3" />
                         <h3 className="font-bold text-lg text-gray-900 dark:text-white mb-2">{p.name}</h3>
                         <div className="space-y-1 text-sm text-gray-500">
@@ -294,7 +333,21 @@ function PartnersTab() {
                 ))}
             </div>
 
-            {showModal && <AddPartnerModal onClose={() => setShowModal(false)} onSuccess={() => { api.get('/internships/partners').then(res => setPartners(res.data.data)); setShowModal(false); }} />}
+            {showModal && (
+                <AddPartnerModal
+                    initialData={editingPartner}
+                    onClose={() => setShowModal(false)}
+                    onSuccess={() => { loadData(); setShowModal(false); }}
+                />
+            )}
+
+            {activePlacement && (
+                <PartnerPlacementModal
+                    partner={activePlacement}
+                    periodId={0}
+                    onClose={() => setActivePlacement(null)}
+                />
+            )}
         </div>
     );
 }
@@ -353,22 +406,32 @@ function PeriodsTab() {
 // ==========================================
 // MODALS
 // ==========================================
-function AddPartnerModal({ onClose, onSuccess }: { onClose: () => void, onSuccess: () => void }) {
-    const [formData, setFormData] = useState({ name: '', city: '', phone: '', contact_person: '' });
+function AddPartnerModal({ onClose, onSuccess, initialData }: { onClose: () => void, onSuccess: () => void, initialData?: any }) {
+    const [formData, setFormData] = useState({
+        name: initialData?.name || '',
+        city: initialData?.city || '',
+        phone: initialData?.phone || '',
+        contact_person: initialData?.contact_person || ''
+    });
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
-            await api.post('/internships/partners', formData);
-            toast.success('Mitra ditambahkan');
+            if (initialData) {
+                await api.put(`/internships/partners/${initialData.id}`, formData);
+                toast.success('Mitra diperbarui');
+            } else {
+                await api.post('/internships/partners', formData);
+                toast.success('Mitra ditambahkan');
+            }
             onSuccess();
-        } catch (e) { toast.error('Gagal tambah mitra'); }
+        } catch (e) { toast.error('Gagal simpan mitra'); }
     };
 
     return (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl w-full max-w-md p-6">
-                <h3 className="text-lg font-bold mb-4">Tambah Mitra Industri</h3>
+                <h3 className="text-lg font-bold mb-4">{initialData ? 'Edit Mitra Industri' : 'Tambah Mitra Industri'}</h3>
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <input required placeholder="Nama Perusahaan/Industri" className="w-full px-4 py-2 border rounded-xl" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} />
                     <input placeholder="Kota" className="w-full px-4 py-2 border rounded-xl" value={formData.city} onChange={e => setFormData({ ...formData, city: e.target.value })} />
@@ -422,56 +485,5 @@ function AddPeriodModal({ onClose, onSuccess }: { onClose: () => void, onSuccess
     );
 }
 
-function AddInternshipModal({ onClose, onSuccess }: { onClose: () => void, onSuccess: () => void }) {
-    const [partners, setPartners] = useState<any[]>([]);
-    const [periods, setPeriods] = useState<any[]>([]);
-    const [students, setStudents] = useState<any[]>([]);
-    const [teachers, setTeachers] = useState<any[]>([]);
-    const [formData, setFormData] = useState({ student_id: '', period_id: '', partner_id: '', supervisor_id: '' });
 
-    useEffect(() => {
-        api.get('/internships/partners').then(res => setPartners(res.data.data));
-        api.get('/internships/periods').then(res => setPeriods(res.data.data));
-        api.get('/lookup/students').then(res => setStudents(res.data.data));
-        api.get('/lookup/teachers').then(res => setTeachers(res.data.data));
-    }, []);
-
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        try {
-            await api.post('/internships', formData);
-            toast.success('Data PKL disimpan');
-            onSuccess();
-        } catch (e) { toast.error('Gagal simpan'); }
-    };
-
-    return (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl w-full max-w-lg p-6">
-                <h3 className="text-lg font-bold mb-4">Daftarkan Siswa PKL</h3>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <select required className="w-full px-4 py-2 border rounded-xl" value={formData.student_id} onChange={e => setFormData({ ...formData, student_id: e.target.value })}>
-                        <option value="">Pilih Siswa</option>
-                        {students.map(s => <option key={s.id} value={s.id}>{s.user?.name || s.name}</option>)}
-                    </select>
-                    <select required className="w-full px-4 py-2 border rounded-xl" value={formData.period_id} onChange={e => setFormData({ ...formData, period_id: e.target.value })}>
-                        <option value="">Pilih Periode</option>
-                        {periods.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                    </select>
-                    <select required className="w-full px-4 py-2 border rounded-xl" value={formData.partner_id} onChange={e => setFormData({ ...formData, partner_id: e.target.value })}>
-                        <option value="">Pilih Mitra Industri</option>
-                        {partners.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                    </select>
-                    <select className="w-full px-4 py-2 border rounded-xl" value={formData.supervisor_id} onChange={e => setFormData({ ...formData, supervisor_id: e.target.value })}>
-                        <option value="">Pilih Pembimbing (Opsional)</option>
-                        {teachers.map(t => <option key={t.id} value={t.user_id}>{t.user?.name || t.name}</option>)}
-                    </select>
-                    <div className="flex justify-end gap-2 mt-4">
-                        <button type="button" onClick={onClose} className="px-4 py-2 rounded-xl hover:bg-gray-100">Batal</button>
-                        <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-xl">Simpan</button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    );
-}
+// End of file
