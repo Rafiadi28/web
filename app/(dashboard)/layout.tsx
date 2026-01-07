@@ -18,6 +18,8 @@ import {
     Menu,
     X,
     ChevronDown,
+    FolderTree,
+    Clock,
     Bell,
     Search,
     Building2,
@@ -27,8 +29,9 @@ import {
     Printer,
     HeartHandshake,
     Monitor,
-    Activity,
+    Activity
 } from 'lucide-react';
+import SidebarItem from './SidebarItem';
 
 interface MenuItem {
     name: string;
@@ -63,15 +66,37 @@ const menuItems: MenuItem[] = [
         roles: ['super_admin', 'admin', 'kepala_sekolah', 'wakil_kepala', 'guru', 'wali_kelas'],
     },
     {
-        name: 'Mata Pelajaran',
-        href: '/subjects',
-        icon: <BookOpen className="w-5 h-5" />,
+        name: 'Kurikulum',
+        href: '#',
+        icon: <FolderTree className="w-5 h-5" />,
         roles: ['super_admin', 'admin', 'kepala_sekolah', 'wakil_kepala', 'guru'],
-    },
-    {
-        name: 'Jadwal',
-        href: '/schedules',
-        icon: <Calendar className="w-5 h-5" />,
+        children: [
+            {
+                name: 'Manajemen Data',
+                href: '/curriculum',
+                icon: <FolderTree className="w-4 h-4" />,
+            },
+            {
+                name: 'Mata Pelajaran',
+                href: '/subjects',
+                icon: <BookOpen className="w-4 h-4" />,
+            },
+            {
+                name: 'Distribusi Guru',
+                href: '/curriculum/teaching-load',
+                icon: <Users className="w-4 h-4" />,
+            },
+            {
+                name: 'Pengaturan Jam',
+                href: '/curriculum/lesson-hours',
+                icon: <Clock className="w-4 h-4" />,
+            },
+            {
+                name: 'Jadwal Pelajaran',
+                href: '/schedules',
+                icon: <Calendar className="w-4 h-4" />,
+            },
+        ]
     },
     {
         name: 'Presensi',
@@ -223,25 +248,14 @@ export default function DashboardLayout({
 
                 {/* Navigation */}
                 <nav className="p-4 space-y-1 overflow-y-auto h-[calc(100vh-8rem)]">
-                    {filteredMenu.map((item) => {
-                        const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
-                        return (
-                            <Link
-                                key={item.href}
-                                href={item.href}
-                                onClick={() => setSidebarOpen(false)}
-                                className={cn(
-                                    'flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all duration-200',
-                                    isActive
-                                        ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
-                                        : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700/50'
-                                )}
-                            >
-                                {item.icon}
-                                <span>{item.name}</span>
-                            </Link>
-                        );
-                    })}
+                    {filteredMenu.map((item, index) => (
+                        <SidebarItem
+                            key={index}
+                            item={item}
+                            pathname={pathname}
+                            onItemClick={() => setSidebarOpen(false)}
+                        />
+                    ))}
                 </nav>
 
                 {/* User Card at Bottom */}

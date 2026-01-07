@@ -125,3 +125,56 @@ body {
   ring-offset: 2px;
   ring-color: hsl(var(--ring));
 }
+
+@media print {
+  /* Hide Sidebar, Header, and User controls */
+  aside, header, .no-print {
+    display: none !important;
+  }
+
+  /* Reset layout constraints */
+  .lg\:pl-64 {
+    padding-left: 0 !important;
+  }
+
+  /* Reset background and colors for printing */
+  body, .min-h-screen {
+    background: white !important;
+    color: black !important;
+  }
+
+  /* Ensure table fits and looks good */
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+  
+  th, td {
+    border: 1px solid #000 !important;
+    padding: 8px !important;
+    color: black !important;
+  }
+  
+  /* Hide scrollbars and Ensure overflow is visible */
+  .overflow-x-auto {
+    overflow: visible !important;
+  }
+  
+  /* Styling for specific elements */
+  .bg-blue-50, .dark\:bg-blue-900\/10 {
+    background-color: #f0f9ff !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  
+  /* Ensure main content takes full width */
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Hide shadows */
+  .shadow-sm, .shadow-md, .shadow-lg {
+    box-shadow: none !important;
+  }
+}
