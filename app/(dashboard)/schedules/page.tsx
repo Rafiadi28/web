@@ -405,39 +405,73 @@ export default function SchedulesPage() {
         }
     };
 
-    // Helper to find lesson in a specific day and JP
-    const getLessonInSlot = (dayIdx: number, jp: number, dayHours: LessonHour[]) => {
+    // Helper to convert HH:mm to minutes
+    const timeToMinutes = (t: string) => {
+        const [h, m] = t.split(':').map(Number);
+        return h * 60 + m;
+    }
+
+    // Checking overlap between two ranges [start1, end1] and [start2, end2]
+    const isOverlapping = (start1: string, end1: string, start2: string, end2: string) => {
+        const s1 = timeToMinutes(start1);
+        const e1 = timeToMinutes(end1);
+        const s2 = timeToMinutes(start2);
+        const e2 = timeToMinutes(end2);
+        return Math.max(s1, s2) < Math.min(e1, e2);
+    }
+
+    // Check if time2 is covered by range [start1, end1]
+    const isCovered = (rangeStart: string, rangeEnd: string, time: string) => {
+        const rs = timeToMinutes(rangeStart);
+        const re = timeToMinutes(rangeEnd);
+        const t = timeToMinutes(time);
+        // Inclusive start, exclusive end for slot logic
+        return t >= rs && t < re;
+    }
+
+    // Helper: Is this slot occupied by any lesson?
+    const getLessonInSlot = (dayIdx: number, slotConfig: LessonHour) => {
+        const daySchedule = schedules.find(s => s.day === dayIdx);
+        if (!daySchedule) return null;
+
+        // Find lesson that overlaps with this slot
+        return daySchedule.lessons.find(l => {
+            // Strict overlap: The lesson's time window overlaps with the slot's time window
+            return isOverlapping(l.start_time, l.end_time, slotConfig.start, slotConfig.end);
+        });
+    };
+
+    // Helper: Is this slot the START of a lesson?
+    // We consider it a start if the lesson's start_time falls within this slot OR checks strict start.
+    // However, for rendering rowspan, we typically want the first slot that overlaps.
+    const getLessonStart = (dayIdx: number, slotConfig: LessonHour, allDaySlots: LessonHour[]) => {
         const daySchedule = schedules.find(s => s.day === dayIdx);
         if (!daySchedule) return null;
 
         return daySchedule.lessons.find(l => {
-            const startJp = dayHours.find(h => h.start === l.start_time)?.slot || 0;
-            const endJp = dayHours.find(h => h.end === l.end_time)?.slot || 0;
-            return jp >= startJp && jp <= endJp;
+            // Does this lesson start in this slot? 
+            // Logic: lesson.start_time is >= slot.start and < slot.end?
+            // OR simpler: Is this the first slot that overlaps with the lesson?
+
+            // Let's find the FIRST slot that overlaps with this lesson
+            const firstOverlappingSlot = allDaySlots.find(s => isOverlapping(l.start_time, l.end_time, s.start, s.end));
+            return firstOverlappingSlot?.slot === slotConfig.slot;
         });
     };
 
-    // Helper to check if this slot is the START of a lesson (to render cell with rowspan)
-    const getLessonStart = (dayIdx: number, jp: number, dayHours: LessonHour[]) => {
-        const daySchedule = schedules.find(s => s.day === dayIdx);
-        if (!daySchedule) return null;
-
-        return daySchedule.lessons.find(l => {
-            // Find which slot this lesson covers based on start time dynamic config
-            const lessonStartSlot = dayHours.find(h => h.start === l.start_time)?.slot;
-            return lessonStartSlot === jp;
-        });
-    };
-
-    // Check if slot is occupied by a lesson starting earlier
-    const isSlotOccupied = (dayIdx: number, jp: number, dayHours: LessonHour[]) => {
+    // Helper: Is this slot occupied by a lesson that started in a PREVIOUS slot?
+    const isSlotOccupied = (dayIdx: number, slotConfig: LessonHour, allDaySlots: LessonHour[]) => {
         const daySchedule = schedules.find(s => s.day === dayIdx);
         if (!daySchedule) return false;
 
         return daySchedule.lessons.some(l => {
-            const startJp = dayHours.find(h => h.start === l.start_time)?.slot || 0;
-            const endJp = dayHours.find(h => h.end === l.end_time)?.slot || 0;
-            return jp > startJp && jp <= endJp;
+            // Overlap
+            if (!isOverlapping(l.start_time, l.end_time, slotConfig.start, slotConfig.end)) return false;
+
+            // Is this the first slot?
+            const firstOverlappingSlot = allDaySlots.find(s => isOverlapping(l.start_time, l.end_time, s.start, s.end));
+            // If this is NOT the first overlapping slot, then it's "occupied" by extension
+            return firstOverlappingSlot?.slot !== slotConfig.slot;
         });
     };
 
